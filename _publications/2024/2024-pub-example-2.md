@@ -19,11 +19,10 @@ abstract: >-
 cover:          /assets/images/covers/decop_thumbnail.png
 authors:
   - André V. Duarte
-  - João Marques
-  - Miguel Graça
-  - Miguel Freire
-  - Lei Li
+  - Xuandong Zhao
   - Arlindo L. Oliveira
+  - Lei Li
+  
 links:
   # Website: 
   Paper: https://arxiv.org/abs/2402.09910

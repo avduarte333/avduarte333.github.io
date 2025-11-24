@@ -1,0 +1,2860 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="description" content="LumberChunker: Efficient Text Chunking with Late Merging">
+  <meta name="keywords" content="LumberChunker, RAG, Text Chunking, LLM">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+  <title>LumberChunker: Long-Form Narrative Document Segmentation</title>
+
+  <!-- Google Fonts -->
+  <link href="https://fonts.googleapis.com/css?family=Google+Sans|Noto+Sans|Castoro" rel="stylesheet">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:400,500,700">
+
+  <!-- Bulma CSS -->
+  <link rel="stylesheet" href="./static/css/bulma.min.css">
+  <link rel="stylesheet" href="./static/css/bulma-carousel.min.css">
+  <link rel="stylesheet" href="./static/css/bulma-slider.min.css">
+  
+  <!-- FontAwesome & Academicons -->
+  <link rel="stylesheet" href="./static/css/fontawesome.all.min.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/jpswalsh/academicons@1/css/academicons.min.css">
+  
+  <!-- Your Custom CSS -->
+  <link rel="stylesheet" href="./static/css/index.css">
+  
+  <!-- Favicon: local Carnegie Mellon seal image (place cmu-seal.png in static/img) -->
+  <link rel="icon" href="./static/img/cmu-seal.png" type="image/png">
+  <!-- Optional fallbacks for devices and older browsers -->
+  <link rel="apple-touch-icon" sizes="180x180" href="./static/img/apple-touch-icon.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="./static/img/favicon-32x32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="./static/img/favicon-16x16.png">
+
+  <!-- jQuery -->
+  <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
+  
+  <!-- Bootstrap CSS AFTER Bulma so that the navbar styles take precedence -->
+  <link rel="stylesheet" 
+        href="https://cdnjs.cloudflare.com/ajax/libs/twitter-bootstrap/4.6.0/css/bootstrap.min.css"
+        integrity="sha512-P5MgMn1jBN01asBgU0z60Qk4QxiXo86+wlFahKrsQf37c9cro517WzVSPPV1tDKzhku2iJ2FVgL67wG03SGnNA=="
+        crossorigin="anonymous" />
+
+  <!-- Bootstrap JS (with Popper.js) -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.14.7/umd/popper.min.js"
+          integrity="sha384-UO2eT0CpHqdSJQ6hJty5KVphtPhzWj9WO1clHTMGa3JDZwrnQq4sF86dIHNDz0W1"
+          crossorigin="anonymous"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/twitter-bootstrap/4.6.0/js/bootstrap.min.js"
+          integrity="sha512-XKa9Hemdy1Ui3KSGJdgMyYlUg1gM+QhL6cnlyTe2qzMCYm4nAZ1PsVerQzTTXzonUR+dmswHqgJPuwCq1MaAg=="
+          crossorigin="anonymous"></script>
+  
+  <!-- FontAwesome, Bulma Carousel, etc. -->
+  <script defer src="./static/js/fontawesome.all.min.js"></script>
+  <script src="./static/js/bulma-carousel.min.js"></script>
+  <script src="./static/js/bulma-slider.min.js"></script>
+  <script src="./static/js/index.js"></script>
+
+  <!-- d3 -->
+  <script src="https://d3js.org/d3.v7.min.js"></script>
+
+  <style>
+    /* Slightly increase the base font size */
+    body {
+      font-size: 20px;
+      color: #424242 !important;
+    }
+
+    p {
+      margin-bottom: 12px !important;
+    }
+
+    /* For mobile devices: change text alignment to left */
+    @media screen and (max-width: 1000px) {
+      .content.has-text-justified {
+        text-align: left !important;
+      }
+    }
+
+    .title.is-3 {
+      color: #3e3e3e !important;
+      font-weight: bold;
+      margin-top: -2rem;
+    }
+
+    .title.is-4 {
+      color: #686868 !important;
+      font-weight: bold;
+      margin-bottom: 0.5rem;
+    }
+
+    .image-wrapper {
+      justify-content: center;
+      align-items: center;
+      margin-bottom: 20px;
+    }
+
+    @media screen and (max-width: 1000px) {
+      .image-wrapper {
+        width: 100% !important;
+      }
+      .image-wrapper img {
+        width: 90% !important;
+      }
+    }
+
+    /* Quiz/Interactive Section Styling */
+    .quiz-section {
+      padding: 1.5rem;
+      border-radius: 10px;
+      margin: 0;
+      box-shadow: none;
+    }
+
+    /* Reduce spacing around quiz section */
+    #quiz.section {
+      padding-top: 1rem !important;
+      padding-bottom: 1rem !important;
+    }
+
+    .quiz-container {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 50px;
+      background: white;
+      border-radius: 10px;
+      padding: 40px;
+      align-items: start;
+      box-shadow: none;
+    }
+
+    @media (max-width: 1024px) {
+      .quiz-container {
+        grid-template-columns: 1fr;
+        gap: 20px;
+      }
+    }
+
+    /* Left Side - Passage */
+    .passage-section {
+      border-left: 4px solid #626161;
+      padding: 20px;
+      border-radius: 6px;
+      height: 600px;
+      min-height: 600px;
+      max-height: 600px;
+      overflow-y: auto;
+      align-self: start;
+    }
+
+    .passage-section h4 {
+      color: #464646;
+      margin-bottom: 15px;
+      font-size: 1.1em;
+      font-weight: 600;
+      font-family: 'Roboto', sans-serif;
+    }
+
+    .passage-sentence {
+      margin: 1px 0;
+      padding: 4px 10px;
+      line-height: 1.3;
+      color: #424242;
+      border-radius: 6px;
+      transition: background-color 0.3s ease, border-left-color 0.3s ease;
+      border-left: 4px solid transparent;
+      font-size: 0.85em;
+      box-sizing: border-box;
+    }
+
+    /* Chunk highlighting colors - combined chunks */
+    .chunk-group {
+      margin: 1px 0;
+      padding: 0;
+      border-radius: 6px;
+      border-left: 4px solid transparent;
+      transition: background-color 0.3s ease, border-left-color 0.3s ease;
+      box-sizing: border-box;
+    }
+
+    .chunk-group.chunk-1 { 
+      background-color: #fff5f5; 
+      border-left-color: #e57373;
+    }
+    .chunk-group.chunk-2 { 
+      background-color: #f0f8ff; 
+      border-left-color: #64b5f6;
+    }
+    .chunk-group.chunk-3 { 
+      background-color: #fffef0; 
+      border-left-color: #ffd54f;
+    }
+
+    .chunk-group .chunk-sentence {
+      margin: 0;
+      padding: 4px 10px;
+      border-left: none;
+      background: transparent;
+      font-size: 0.85em;
+      line-height: 1.3;
+      box-sizing: border-box;
+    }
+
+    /* Right Side - Interaction */
+    .interaction-section {
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .interaction-section h4 {
+      color: #3e3e3e;
+      font-size: 1.1em;
+      margin-bottom: 15px;
+      font-weight: 600;
+      font-family: 'Roboto', sans-serif;
+    }
+
+    .answer-phase, .solution-phase {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+      overflow-y: auto;
+      padding: 2px;
+    }
+
+    .solution-phase {
+      opacity: 0;
+      transition: opacity 0.4s ease-in-out;
+    }
+
+    .solution-phase.show {
+      opacity: 1;
+    }
+
+    /* Options Styling */
+    .options-container {
+      display: flex;
+      flex-direction: column;
+      gap: 15px;
+      margin-bottom: 25px;
+      flex: 1;
+      overflow-y: auto;
+      padding: 2px 0;
+    }
+
+    .option-card {
+      border: 2px solid #e0e0e0;
+      border-radius: 8px;
+      padding: 18px;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      background-color: white;
+    }
+
+    .option-card:hover {
+      border-color: #9e9e9e;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+      transform: translateY(-1px);
+    }
+
+    .option-card.selected {
+      border-color: #464646;
+      background-color: #f8f9fa;
+      box-shadow: 0 4px 12px rgba(70,70,70,0.15);
+    }
+
+    .option-header {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .option-header input[type="radio"] {
+      width: 18px;
+      height: 18px;
+      cursor: pointer;
+    }
+
+    .option-header label {
+      flex: 1;
+      cursor: pointer;
+      font-size: 1em;
+      color: #424242;
+      font-family: 'Roboto', sans-serif;
+    }
+
+    .option-header label strong {
+      color: #3e3e3e;
+      font-weight: 600;
+    }
+
+    /* Solution Styling */
+    .solution-content {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      overflow-y: auto;
+      padding-right: 5px;
+    }
+
+    .result-header {
+      text-align: center;
+      padding: 12px;
+      border-radius: 6px;
+      margin-bottom: 12px;
+    }
+
+    .result-header.correct {
+      background-color: #f1f8f4;
+      border: 2px solid #81c784;
+    }
+
+    .result-header.incorrect {
+      background-color: #fff5f5;
+      border: 2px solid #e57373;
+    }
+
+    .result-header h3 {
+      font-size: 1.1em;
+      margin-bottom: 4px;
+      color: #3e3e3e;
+      font-weight: 600;
+      font-family: 'Roboto', sans-serif;
+    }
+
+    .result-header p {
+      font-size: 0.8em;
+      color: #424242;
+      margin: 0;
+    }
+
+    .feedback-box {
+      background-color: #f8f9fa;
+      border-left: 4px solid #626161;
+      padding: 10px;
+      margin-bottom: 12px;
+      border-radius: 4px;
+      font-size: 0.8em;
+      line-height: 1.4;
+    }
+
+    .correct-feedback {
+      background-color: #f1f8f4;
+      border-left-color: #81c784;
+    }
+
+    .chunk-display {
+      background-color: white;
+      border: 1px solid #e0e0e0;
+      border-radius: 6px;
+      padding: 10px;
+      margin-bottom: 8px;
+    }
+
+    .chunk-display h5 {
+      color: #464646;
+      margin-bottom: 6px;
+      font-size: 0.9em;
+      font-weight: 600;
+      font-family: 'Roboto', sans-serif;
+    }
+
+    .reasoning-box {
+      background-color: #fffef0;
+      border-left: 4px solid #ffd54f;
+      padding: 8px;
+      border-radius: 4px;
+      font-size: 0.75em;
+      line-height: 1.3;
+    }
+
+    .reasoning-box strong {
+      color: #3e3e3e;
+      font-weight: 600;
+    }
+
+    /* Aligned chunk definitions */
+    .chunk-definitions {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .chunk-definition {
+      position: relative;
+    }
+
+    .chunk-definition.chunk-1 {
+      border-left: 4px solid #e57373;
+      background-color: #fff5f5;
+    }
+
+    .chunk-definition.chunk-2 {
+      border-left: 4px solid #64b5f6;
+      background-color: #f0f8ff;
+    }
+
+    /* Controls */
+    .quiz-controls {
+      margin-top: auto;
+      padding-top: 15px;
+    }
+
+    .quiz-btn {
+      padding: 12px 28px;
+      border: 1px solid #e0e0e0;
+      border-radius: 6px;
+      cursor: pointer;
+      font-weight: 500;
+      transition: all 0.25s ease;
+      font-size: 1em;
+      font-family: 'Roboto', sans-serif;
+      background-color: #ffffff;
+      color: #464646;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.08);
+    }
+
+    .quiz-btn:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 4px 8px rgba(0,0,0,0.12);
+    }
+
+    .submit-btn {
+      background-color: #464646;
+      color: white;
+      border-color: #464646;
+    }
+
+    .submit-btn:hover {
+      background-color: #3e3e3e;
+      border-color: #3e3e3e;
+    }
+
+    .back-btn {
+      background-color: #464646;
+      color: white;
+      border-color: #464646;
+    }
+
+    .back-btn:hover {
+      background-color: #3e3e3e;
+      border-color: #3e3e3e;
+    }
+
+    /* Custom Tab Styling */
+    .custom-tabs {
+      margin-bottom: 1.5rem !important;
+      border-bottom: 1px solid #e0e0e0 !important;
+      font-family: 'Roboto', sans-serif !important;
+    }
+
+    .custom-tabs ul {
+      display: flex !important;
+      justify-content: center !important;
+      list-style: none !important;
+      padding: 0 !important;
+      margin: 0 !important;
+    }
+
+    .custom-tabs ul li {
+      padding: 0.75rem 1.5rem !important;
+      margin: 0 0.5rem !important;
+      cursor: pointer !important;
+      position: relative !important;
+      font-size: 1.1rem !important;
+      color: #9e9e9e !important;
+      transition: color 0.25s ease !important;
+    }
+
+    .custom-tabs ul li:not(.is-active):hover {
+      color: rgb(47, 47, 47) !important;
+    }
+
+    .custom-tabs ul li.is-active {
+      color: #464646 !important;
+      font-weight: 600 !important;
+    }
+
+    .custom-tabs ul li.is-active::after {
+      content: '' !important;
+      position: absolute !important;
+      left: 0 !important;
+      right: 0 !important;
+      bottom: -1px !important;
+      height: 3px !important;
+      background-color: #464646 !important;
+      border-radius: 2px !important;
+    }
+
+    /* Card-like Table Container */
+    .table-card {
+      margin: 0 auto !important;
+      max-width: 100% !important;
+    }
+
+    /* Responsive table styling using Bulma */
+    table.table {
+      width: 100% !important;
+      font-family: 'Roboto', sans-serif !important;
+      border-collapse: collapse !important;
+    }
+
+    /* Make Columns take always the same width */
+    table.table th:nth-child(n+2),
+    table.table td:nth-child(n+2) {
+      width: 20% !important;
+    }
+
+    /* Centered, refined caption styling */
+    table.table caption {
+      caption-side: top !important;
+      text-align: center !important;
+      font-weight: 600 !important;
+      margin-bottom: 0.75rem !important;
+      font-size: 1.15rem !important;
+      color: #464646 !important;
+    }
+
+    /* Optional: subtle table cell styling */
+    table.table th,
+    table.table td {
+      padding: 0.75rem !important;
+      border: 1px solid #f0f0f0 !important;
+      text-align: center !important;
+      font-size: clamp(0.65rem, 2vw, 1rem) !important;
+      color: #464646 !important;
+    }
+
+    table.table th {
+      background: #fafafa !important;
+      vertical-align: middle !important;
+    }
+
+    .table-card table.table th:first-child,
+    .table-card table.table td:first-child {
+      white-space: nowrap !important;
+      text-align: left !important;
+    }
+
+    .table-card table.table thead th:nth-child(2) {
+      white-space: nowrap !important;
+    }
+
+    .table-card table.table thead th:first-child {
+      background: transparent !important;
+      border-top: none !important;
+      border-left: none !important;
+    }
+
+    /* Algorithm box styling */
+    .algorithm-box {
+      background-color: #f5f5f5;
+      border-left: 4px solid #626161;
+      padding: 1.5rem;
+      margin: 1.5rem 0;
+      border-radius: 4px;
+    }
+
+    .algorithm-box code {
+      background-color: #fff;
+      padding: 0.2rem 0.4rem;
+      border-radius: 3px;
+      font-size: 0.9em;
+    }
+
+    /* Custom styling for theta slider */
+    #theta-slider {
+      -webkit-appearance: none;
+      appearance: none;
+      height: 8px;
+      background: #ddd;
+      border-radius: 5px;
+      outline: none;
+    }
+
+    #theta-slider::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 20px;
+      height: 20px;
+      background: #808080;
+      border-radius: 50%;
+      cursor: pointer;
+    }
+
+    /* Hide the default slider thumb since we're using custom markers */
+    #theta-slider::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 0;
+      height: 0;
+      background: transparent;
+      cursor: pointer;
+      border: none;
+    }
+
+    #theta-slider::-moz-range-thumb {
+      width: 0;
+      height: 0;
+      background: transparent;
+      border-radius: 50%;
+      cursor: pointer;
+      border: none;
+    }
+
+  </style>
+</head>
+<body>
+
+  <!-- Begin Bulma-Based Page Content -->
+
+  <section class="hero">
+    <div class="hero-body">
+      <div class="container is-max-desktop">
+        <div class="columns is-centered">
+          <div class="column has-text-centered">
+            <h1 class="title is-1 publication-title">
+              LumberChunker: Long-Form Narrative Document Segmentation
+            </h1>
+            <p style="font-size: 1.1rem; color: #666; margin-bottom: 1rem;">
+              Blog created by Raymond Jiang<sup>3</sup>
+            </p>
+            <div class="is-size-5 publication-authors">
+              <span class="author-block">
+                <a href="https://avduarte333.github.io/">André V. Duarte</a><sup>1</sup>,
+              </span>
+              <span class="author-block">
+                <a href="https://www.linkedin.com/in/joaopdsmarques/">João Marques</a><sup>1</sup>,
+              </span>
+              <span class="author-block">
+                <a href="https://www.linkedin.com/in/miguel-gra%C3%A7a-74219719b/">Miguel Graça</a><sup>1</sup>
+              </span>
+              <span class="author-block">
+                <a href="https://www.linkedin.com/in/miguel-freire-907782108/">Miguel Freire</a><sup>2</sup>
+              </span>
+              <span class="author-block">
+                <a href="https://lileicc.github.io/">Lei Li</a><sup>3</sup>
+              </span>
+              <span class="author-block">
+                <a href="https://web.tecnico.ulisboa.pt/arlindo.oliveira/">Arlindo Oliveira</a><sup>1</sup>
+              </span>
+            </div>
+            <div class="is-size-5 publication-authors">
+              <span class="author-block"><sup>1</sup>INESC-ID / Instituto Superior Técnico, <sup>2</sup>NeuralShift AI, <sup>3</sup>Carnegie Mellon University</span>
+            </div>
+            <div class="column has-text-centered">
+              <div class="publication-links">
+                <!-- PDF Link -->
+                <span class="link-block">
+                  <a href="https://arxiv.org/pdf/2406.17526" target="_blank" class="external-link button is-normal is-rounded is-dark">
+                    <span class="icon"><i class="fas fa-file-pdf"></i></span>
+                    <span>Paper</span>
+                  </a>
+                </span>
+                <!-- Code Link -->
+                <span class="link-block">
+                  <a href="https://github.com/joaodsmarques/LumberChunker" target="_blank" class="external-link button is-normal is-rounded is-dark">
+                    <span class="icon"><i class="fab fa-github"></i></span>
+                    <span>Code</span>
+                  </a>
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+
+  <!-- Teaser Section -->
+  <section class="section">
+    <div class="container is-max-desktop">
+      <div class="columns is-centered">
+        <div class="column is-four-fifths has-text-centered">
+          <div class="image-wrapper" id="pipeline-image-wrapper" style="display: flex; justify-content: center; align-items: center;">
+          </div>
+          <p style="margin-top: 1rem;">
+            We present LumberChunker, a method for semantically segmenting long-form narrative documents that achieves state-of-the-art retrieval performance while requiring significantly fewer embedding computations than existing approaches.
+          </p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  
+<!-- Introduction & Key Idea -->
+<section class="section">
+  <div class="container is-max-desktop">
+    <div class="columns is-centered has-text-left">
+      <div class="column is-four-fifths">
+        <h2 class="title is-3">Introduction</h2>
+        <div class="content has-text-justified">
+          <p>
+            Long-form narratives (novels, memoirs, transcripts) don’t break cleanly at fixed token counts. If we split them poorly, Retrieval-Augmented Generation (RAG) pipelines surface the wrong passages and LLMs start guessing. Structure-only chunkers (fixed tokens, paragraphs) are fast but blind to scene and topic flow; purely similarity-driven heuristics can fragment dialogue, miss coreference, and drift as context grows.
+          </p>
+          <p>
+            <span style="font-weight: 600;">So how do we preserve the story’s flow and still keep chunking practical?</span>
+          </p>
+
+          <h2 class="title is-4">The Key Idea</h2>
+          <p>
+            Treat segmentation as <em>boundary finding</em>. LumberChunker reads a rolling window of consecutive paragraphs (up to a token count <code>θ</code>) and asks an LLM to return the <strong>earliest paragraph where the content clearly shifts</strong> from what came before. That paragraph marks a boundary; the next chunk starts there. Repeat until the document ends.
+          </p>
+          <p>
+            This simple prompt design yields reliable, human-like cuts because:
+          </p>
+          <ul>
+            <li>
+              <strong>Low false positives when no shift exists.</strong> Without a genuine topic/scene turn, the model rarely flags a boundary, so chunks don’t fracture mid-thought.
+            </li>
+            <li>
+              <strong>High hit-rate when a shift does exist.</strong> When the narrative pivots (new scene, entity, objective), the model consistently identifies the earliest turning point, preserving coherence.
+            </li>
+          </ul>
+          <p>
+            In practice, sweeping the window size shows a sweet spot around <strong>θ ≈ 550 tokens</strong>: enough context to recognize transitions, but not so much that the signal gets diluted.
+          </p>
+
+          <p>
+            Want to test your understanding? Try the interactive quiz below to see if you can identify the optimal way to segment a passage.
+          </p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+  <!-- Interactive Quiz Section -->
+  <section class="section" id="quiz" style="margin-top: 0; margin-bottom: 0; padding-top: 1rem; padding-bottom: 1rem;">
+    <div class="container is-max-widescreen">
+      <div class="quiz-section">
+        <div class="quiz-header">
+          <h3 style="color: #3e3e3e; font-size: 1.4em; margin-bottom: 8px; font-weight: 600; text-align: center;">Text Segmentation Quiz</h3>
+          <p style="color: #686868; font-size: 0.9em; text-align: center; margin-bottom: 20px;">Choose the best way to segment this passage into semantic chunks</p>
+        </div>
+        
+        <div class="quiz-container" id="quizContainer">
+          <!-- Left Side - Passage -->
+          <div class="passage-section">
+            <h4>Passage:</h4>
+            <div id="passageContainer">
+              <!-- Passage sentences will be inserted here -->
+            </div>
+          </div>
+
+          <!-- Right Side - Options/Solution -->
+          <div class="interaction-section">
+            <!-- Answer Selection Phase -->
+            <div class="answer-phase" id="answerPhase">
+              <h4>How should this passage be segmented?</h4>
+              <div id="optionsContainer">
+                <!-- Options will be inserted here -->
+              </div>
+              <div class="quiz-controls">
+                <button class="quiz-btn submit-btn" id="submitBtn">Submit Answer</button>
+              </div>
+            </div>
+
+            <!-- Solution Phase (initially hidden) -->
+            <div class="solution-phase" id="solutionPhase" style="display: none;">
+              <div id="solutionContent">
+                <!-- Solution content will be inserted here -->
+              </div>
+              <div class="quiz-controls">
+                <button class="quiz-btn back-btn" id="backBtn">← Try Again</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+
+  <!-- Method Section (Updated to LumberChunker style) -->
+  <section class="section" id="method">
+    <div class="container is-max-desktop">
+      <div class="columns is-centered has-text-left">
+        <div class="column is-four-fifths">
+          <h2 class="title is-3">The LumberChunker Method</h2>
+          <div class="content has-text-justified">
+
+            <p>
+              LumberChunker treats document segmentation as a <em>boundary-finding</em> problem. Instead of cutting by fixed tokens or paragraphs, we ask an LLM to read a rolling window of consecutive paragraphs and return the <strong>first paragraph where the content clearly shifts</strong>. That cut becomes the end of the current chunk and the start of the next, which yields variable-length, semantically coherent segments that track narrative flow.
+            </p>
+
+            <h3 class="title is-4" id="step1-extraction">1) Document i Paragraph Extraction</h3>
+            <p>
+              Cleanly split the book into paragraphs and assign stable IDs (<code>p1, p2, …</code>). This preserves the document’s natural discourse units and gives us safe candidate boundaries.
+            </p>
+
+            <div class="algorithm-box">
+              <strong>Example:</strong> From a novel, we extract:<br><br>
+              <code>p1</code>: "The morning sun filtered through the dusty windows..."<br>
+              <code>p2</code>: "She walked slowly to the door, hesitating..."<br>
+              <code>p3</code>: "Meanwhile, across town, Detective Morrison reviewed the case files..."<br>
+              <code>p4</code>: "The previous night's events had left him puzzled..."<br><br>
+              Each paragraph gets a unique ID for tracking boundaries.
+            </div>
+
+            <h3 class="title is-4" id="step2-grouping">2) IDs Grouping (G<sub>i</sub>) for LLM</h3>
+            <p>
+              Build a rolling group <code>G<sub>i</sub></code> by appending paragraphs until the group’s length reaches a token budget <code>θ</code>. This provides enough context for the model to judge when a topic/scene actually shifts.
+            </p>
+
+            <div class="algorithm-box">
+              <strong>Example:</strong> With <code>θ = 550</code> tokens, we build:<br><br>
+              <code>G<sub>1</sub></code> = [<code>p1</code>, <code>p2</code>, <code>p3</code>, <code>p4</code>, <code>p5</code>, <code>p6</code>]<br><br>
+              This window contains ~550 tokens spanning multiple paragraphs, giving the LLM enough context to detect where the narrative shifts—perhaps from the woman's scene to the detective's investigation.
+            </div>
+
+            <h3 class="title is-4" id="step3-query">3) Gemini Query</h3>
+            <p>
+              Prompt the model with the paragraphs in <code>G<sub>i</sub></code> and ask it to return the <em>first</em> paragraph (not the very first in the group) where content clearly changes relative to what came before. Use that returned ID as the chunk boundary; start the next group at that paragraph and repeat to the end of the book.
+            </p>
+
+            <div class="algorithm-box">
+              <strong>Example:</strong> Given <code>G<sub>1</sub></code> = [<code>p1</code>, <code>p2</code>, <code>p3</code>, <code>p4</code>, <code>p5</code>, <code>p6</code>], the LLM responds:<br><br>
+              <em>"The content shifts at <code>p3</code>, where we transition from the woman's morning routine to Detective Morrison's investigation."</em><br><br>
+              <strong>Step 4: Answer Extraction</strong><br>
+              We extract <code>p3</code> as the boundary. This creates:<br>
+              • <strong>Chunk 1</strong>: [<code>p1</code>, <code>p2</code>] — Woman's scene<br>
+              • <strong>Next group starts at</strong> <code>p3</code> — Detective's investigation
+            </div>
+
+            <h3 class="title is-4">Choosing the context size (θ)</h3>
+            <p>
+              We sweep <code>θ ∈ [450, 1000]</code> tokens and find that <strong>θ ≈ 550</strong> consistently maximizes retrieval quality: large enough for context, small enough to keep the model focused on the current turn in the story.
+            </p>
+
+            <!-- <div class="notification is-info is-light">
+              <strong>Include Figure 2 here (full-width):</strong> DCG@k across different <code>θ</code>, with <code>θ=550</code> highlighted as the sweet spot.
+            </div> -->
+            <div style="margin-bottom: 20px;">
+              <div style="display: flex; align-items: flex-start; justify-content: center; gap: 20px; margin-bottom: 5px;">
+                <label for="theta-slider" style="font-weight: 600; font-size: 22px; font-family: 'Roboto', sans-serif; padding-top: 2px;">θ (Token Budget):</label>
+                <div style="position: relative; width: 300px;">
+                  <!-- Circular markers positioned on top of the slider -->
+                  <div id="slider-markers" style="position: absolute; top: 50%; width: 100%; height: 20px; pointer-events: none; transform: translateY(-50%);">
+                    <div class="slider-marker" data-index="0" style="position: absolute; left: 0%; transform: translate(-50%, -50%);">
+                      <div style="width: 18px; height: 18px; border-radius: 50%; background-color: white; border: 3px solid #424242;"></div>
+                    </div>
+                    <div class="slider-marker" data-index="1" style="position: absolute; left: 33.33%; transform: translate(-50%, -50%);">
+                      <div style="width: 18px; height: 18px; border-radius: 50%; background-color: #424242; border: 3px solid #424242;"></div>
+                    </div>
+                    <div class="slider-marker" data-index="2" style="position: absolute; left: 66.67%; transform: translate(-50%, -50%);">
+                      <div style="width: 18px; height: 18px; border-radius: 50%; background-color: white; border: 3px solid #424242;"></div>
+                    </div>
+                    <div class="slider-marker" data-index="3" style="position: absolute; left: 100%; transform: translate(-50%, -50%);">
+                      <div style="width: 18px; height: 18px; border-radius: 50%; background-color: white; border: 3px solid #424242;"></div>
+                    </div>
+                  </div>
+                  <input type="range" id="theta-slider" min="0" max="3" value="1" step="1" 
+                         style="width: 100%; cursor: pointer;">
+                  <!-- Precisely aligned tick labels under the slider -->
+                  <div style="position: relative; height: 22px; margin-top: 5px;">
+                    <span style="position: absolute; left: 0%; transform: translateX(-50%); font-size: 18px; color: #666; font-family: 'Roboto', sans-serif;">450</span>
+                    <span style="position: absolute; left: 33.33%; transform: translateX(-50%); font-size: 18px; color: #666; font-family: 'Roboto', sans-serif;">550</span>
+                    <span style="position: absolute; left: 66.67%; transform: translateX(-50%); font-size: 18px; color: #666; font-family: 'Roboto', sans-serif;">650</span>
+                    <span style="position: absolute; left: 100%; transform: translateX(-50%); font-size: 18px; color: #666; font-family: 'Roboto', sans-serif;">1000</span>
+                  </div>
+                </div>
+                <span id="theta-value" style="font-weight: 700; font-size: 20px; color: #ffa726; min-width: 70px; font-family: 'Roboto', sans-serif; padding-top: 2px;">550</span>
+              </div>
+            </div>
+            <div class="image-wrapper" id="dcg-image-wrapper" style="display: flex; justify-content: center; align-items: center;">
+            </div>
+            <h3 class="title is-5">Why this works</h3>
+            <p>
+              Narratives work off of topic turns, scene changes, and discourse shifts, not uniform token distances. By explicitly locating the earliest meaningful change inside a window, LumberChunker produces variable-length chunks that keep entities and events intact, improving retrieval quality downstream.
+            </p>
+            <h3 class="title is-4">Granularity that “feels right”</h3>
+            <p>
+              Average chunk sizes (tokens) on the 100-book corpus: Paragraph ~79, Semantic ~185, Recursive ~399, <strong>LumberChunker ~334</strong>, Proposition ~12. Even with <code>θ=550</code>, the model frequently finds earlier shifts, yielding compact, on-topic chunks and reducing “lost-in-the-middle” effects.
+            </p>
+
+            <!-- Table 10: Average tokens and total chunks per method -->
+
+            <!-- Accessible HTML table fallback (renders even if image is missing) -->
+            <div class="table-card" aria-labelledby="table10-caption">
+              <table class="table is-bordered is-hoverable">
+                <caption id="table10-caption">Table 10: The average number of tokens per chunk and the total number of chunks after segmenting each book in the GutenQA.</caption>
+                <thead>
+                  <tr>
+                    <th style="text-align: left;">Method</th>
+                    <th>Avg. #Tokens / Chunk</th>
+                    <th>Total #Chunks</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td style="text-align: left;">Semantic Chunking</td>
+                    <td>185 tokens</td>
+                    <td>191059</td>
+                  </tr>
+                  <tr>
+                    <td style="text-align: left;">Paragraph Level</td>
+                    <td>79 tokens</td>
+                    <td>248307</td>
+                  </tr>
+                  <tr>
+                    <td style="text-align: left;">Recursive Chunking</td>
+                    <td>399 tokens</td>
+                    <td>31787</td>
+                  </tr>
+                  <tr>
+                    <td style="text-align: left;">Proposition-Level</td>
+                    <td>12 tokens</td>
+                    <td>914493</td>
+                  </tr>
+                  <tr style="background-color: #f0f8ff;">
+                    <td style="text-align: left;">LumberChunker</td>
+                    <td><strong>334 tokens</strong></td>
+                    <td><strong>36917</strong></td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Results Section: GutenQA -->
+  <section class="section" id="gutenqa">
+    <div class="container is-max-desktop">
+      <div class="columns is-centered has-text-left">
+        <div class="column is-four-fifths">
+          <h2 class="title is-3">GutenQA: Movie-style results, but for books</h2>
+          <div class="content has-text-justified">
+
+            <p>
+              To evaluate chunking where it matters, we introduce <strong>GutenQA</strong>, a benchmark of <strong>100</strong> carefully cleaned public-domain books paired with <strong>3,000</strong> needle-in-a-haystack QA items (short, verifiable answers). This lets us measure <em>passage retrieval</em> precisely and then see how that lift translates into <em>RAG QA</em>.
+            </p>
+
+
+            <h3 class="title is-4">Retrieval: LumberChunker leads ⭐</h3>
+            <p>
+              Across DCG@k and Recall@k, LumberChunker ranks first. At <code>k=20</code>, it reaches <strong>DCG ≈ 62.1</strong> and <strong>Recall ≈ 77.9%</strong>, outperforming strong baselines like Recursive, Paragraph, Semantic, and Proposition chunking.
+            </p>
+
+            <div style="text-align: center; margin-bottom: 1rem;">
+              <p style="font-weight: 600; font-size: 1.15rem; color: #464646; margin-bottom: 0.25rem;">Retrieval Performance Comparison</p>
+              <p style="font-weight: 200; font-size: 1rem; color: #666;">GutenQA</p>
+            </div>
+
+            <!-- Custom Tab Interface -->
+            <div class="custom-tabs">
+              <ul>
+                <li class="is-active" data-view="ndcg">DCG @ k</li>
+                <li data-view="recall">Recall@k</li>
+              </ul>
+            </div>
+
+            <!-- Table Card for DCG @ k -->
+            <div id="table-container-ndcg" class="table-card">
+              <table class="table is-bordered is-hoverable">
+                <thead>
+                  <tr>
+                    <th></th>
+                    <th>1</th>
+                    <th>2</th>
+                    <th>5</th>
+                    <th>10</th>
+                    <th>20</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <th>Semantic Chunking</th>
+                    <td>29.50</td>
+                    <td>35.31</td>
+                    <td>40.67</td>
+                    <td>43.14</td>
+                    <td>44.74</td>
+                  </tr>
+                  <tr>
+                    <th>Paragraph-Level</th>
+                    <td>36.54</td>
+                    <td>42.11</td>
+                    <td>45.87</td>
+                    <td>47.72</td>
+                    <td>49.00</td>
+                  </tr>
+                  <tr>
+                    <th>Recursive Chunking</th>
+                    <td>39.04</td>
+                    <td>45.37</td>
+                    <td>50.66</td>
+                    <td>53.25</td>
+                    <td>54.72</td>
+                  </tr>
+                  <tr>
+                    <th>HyDE<sup>†</sup></th>
+                    <td>33.47</td>
+                    <td>39.74</td>
+                    <td>45.06</td>
+                    <td>48.14</td>
+                    <td>49.92</td>
+                  </tr>
+                  <tr>
+                    <th>Proposition-Level</th>
+                    <td>36.91</td>
+                    <td>42.42</td>
+                    <td>44.88</td>
+                    <td>45.65</td>
+                    <td>46.19</td>
+                  </tr>
+                  <tr style="background-color: #f0f8ff;">
+                    <th>LumberChunker</th>
+                    <td><strong>48.28</strong></td>
+                    <td><strong>54.86</strong></td>
+                    <td><strong>59.37</strong></td>
+                    <td><strong>60.99</strong></td>
+                    <td><strong>62.09</strong></td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            <!-- Table Card for Recall@k (initially hidden) -->
+            <div id="table-container-recall" class="table-card" style="display: none;">
+              <table class="table is-bordered is-hoverable">
+                <thead>
+                  <tr>
+                    <th></th>
+                    <th>1</th>
+                    <th>2</th>
+                    <th>5</th>
+                    <th>10</th>
+                    <th>20</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <th>Semantic Chunking</th>
+                    <td>29.50</td>
+                    <td>38.70</td>
+                    <td>50.60</td>
+                    <td>58.21</td>
+                    <td>64.51</td>
+                  </tr>
+                  <tr>
+                    <th>Paragraph-Level</th>
+                    <td>36.54</td>
+                    <td>45.37</td>
+                    <td>53.67</td>
+                    <td>59.34</td>
+                    <td>64.34</td>
+                  </tr>
+                  <tr>
+                    <th>Recursive Chunking</th>
+                    <td>39.04</td>
+                    <td>49.07</td>
+                    <td>60.64</td>
+                    <td>68.62</td>
+                    <td>74.35</td>
+                  </tr>
+                  <tr>
+                    <th>HyDE<sup>†</sup></th>
+                    <td>33.47</td>
+                    <td>43.41</td>
+                    <td>55.11</td>
+                    <td>64.61</td>
+                    <td>71.61</td>
+                  </tr>
+                  <tr>
+                    <th>Proposition-Level</th>
+                    <td>36.91</td>
+                    <td>45.64</td>
+                    <td>51.04</td>
+                    <td>53.41</td>
+                    <td>55.54</td>
+                  </tr>
+                  <tr style="background-color: #f0f8ff;">
+                    <th>LumberChunker</th>
+                    <td><strong>48.28</strong></td>
+                    <td><strong>58.71</strong></td>
+                    <td><strong>68.58</strong></td>
+                    <td><strong>73.58</strong></td>
+                    <td><strong>77.92</strong></td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            <script>
+              document.addEventListener('DOMContentLoaded', function() {
+                const tabs = document.querySelectorAll('.custom-tabs ul li');
+                const ndcgContainer = document.getElementById('table-container-ndcg');
+                const recallContainer = document.getElementById('table-container-recall');
+              
+                tabs.forEach(tab => {
+                  tab.addEventListener('click', () => {
+                    // Remove active state from all tabs
+                    tabs.forEach(t => t.classList.remove('is-active'));
+                    // Activate the clicked tab
+                    tab.classList.add('is-active');
+              
+                    // Toggle the table containers
+                    if (tab.getAttribute('data-view') === 'ndcg') {
+                      ndcgContainer.style.display = 'block';
+                      recallContainer.style.display = 'none';
+                    } else {
+                      ndcgContainer.style.display = 'none';
+                      recallContainer.style.display = 'block';
+                    }
+                  });
+                });
+              });
+            </script>
+
+            <h3 class="title is-4">Downstream QA: targeted retrieval beats giant context</h3>
+            <p>
+              Plugging chunks into a standard RAG pipeline (on autobiographies), <strong>RAG-LumberChunker</strong> surpasses <strong>RAG-Recursive</strong> and trails only <strong>RAG-Manual</strong> (hand-segmented ground truth). Notably, an “open-book” non-retrieval setting with huge context windows still underperforms RAG. (<em>targeted passages beat raw context size</em>.)
+            </p>
+
+            <!-- <div class="notification is-warning is-light">
+              <strong>Include Figure 3 here (full-width):</strong> QA accuracy comparison (RAG-LumberChunker, RAG-Recursive, RAG-Manual, and non-RAG open-book).
+            </div> -->
+
+            <div class="image-wrapper" id="qa-image-wrapper" style="display: flex; justify-content: center; align-items: center;">
+            </div>
+
+            <h3 class="title is-4">Closer to human boundaries</h3>
+            <p>
+              Compared against manual chunks, LumberChunker achieves <strong>ROUGE-L ≈ 0.709</strong> vs. <strong>≈ 0.689</strong> for Recursive chunks, which is evidence that its boundaries align with how readers naturally perceive topic shifts.
+            </p>
+
+            <!-- Table 2: Similarity to manual segmentation (ROUGE-L) -->
+            <div class="table-card" aria-labelledby="table2-caption">
+              <table class="table is-bordered is-hoverable">
+                <caption id="table2-caption">Table 2: Average ROUGE-L scores of methods compared to Manual Chunks.</caption>
+                <thead>
+                  <tr>
+                    <th style="text-align: left;">Method</th>
+                    <th>Average ROUGE-L Score</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td style="text-align: left;">Recursive Chunks</td>
+                    <td>0.689</td>
+                  </tr>
+                  <tr style="background-color: #f0f8ff;">
+                    <td style="text-align: left;">LumberChunker</td>
+                    <td><strong>0.709</strong></td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Conclusion Section -->
+  <section class="section" style="margin-top: -2rem;">
+    <div class="container is-max-desktop">
+      <div class="columns is-centered has-text-left">
+        <div class="column is-four-fifths">
+          <h2 class="title is-3">Conclusion</h2>
+          <div class="content has-text-justified">
+            <p>
+              LumberChunker shows that <strong>LLM-guided narrative segmentation</strong> can strike a rare balance of preserving story flow without demanding massive compute or retraining. 
+              By letting an LLM detect <em>where meaning actually shifts</em> inside rolling paragraph windows, we obtain chunks that feel natural to humans and perform better for machines.
+            </p>
+
+            <p>
+              On the <strong>GutenQA benchmark</strong>, LumberChunker consistently improves retrieval and downstream QA over traditional fixed-size and recursive methods,
+              approaching the quality of manual, human-curated segmentations. Its efficiency, roughly linear in paragraph count, makes it practical for large-scale preprocessing in RAG pipelines.
+            </p>
+
+            <p style="margin-top: 1.5rem;">
+              As RAG systems continue to scale, <strong>effective document segmentation</strong> will remain a key frontier.
+              LumberChunker offers a practical step forward—one that respects both meaning and efficiency, making
+              long-form understanding more accessible to modern language models.
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Citation Section -->
+  <section class="section" style="background-color: #f8f9fa; margin-top: 2rem; padding: 2rem 0;">
+    <div class="container is-max-desktop">
+      <div class="columns is-centered">
+        <div class="column is-four-fifths">
+          <h2 class="title is-3">Citation</h2>
+          <div class="content">
+            <p>If you find LumberChunker useful in your research, please consider citing:</p>
+            <div style="position: relative;">
+              <button id="copy-citation-btn" style="position: absolute; top: 10px; right: 10px; padding: 8px 16px; background-color: #2196F3; color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 14px; font-weight: 500; transition: background-color 0.3s; z-index: 10; display: flex; align-items: center; gap: 6px;" onmouseover="this.style.backgroundColor='#1976D2'" onmouseout="this.style.backgroundColor='#2196F3'">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                  <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                </svg>
+                <span id="copy-btn-text">Copy</span>
+              </button>
+              <pre id="citation-text" style="background-color: #ffffff; padding: 1rem; padding-top: 2.5rem; border-radius: 5px; overflow-x: auto;"><code>@inproceedings{duarte-etal-2024-lumberchunker,
+    title = "{L}umber{C}hunker: Long-Form Narrative Document Segmentation",
+    author = "Duarte, Andr{\'e} V.  and
+      Marques, Jo{\~a}o DS  and
+      Gra{\c{c}}a, Miguel  and
+      Freire, Miguel  and
+      Li, Lei  and
+      Oliveira, Arlindo L.",
+    editor = "Al-Onaizan, Yaser  and
+      Bansal, Mohit  and
+      Chen, Yun-Nung",
+    booktitle = "Findings of the Association for Computational Linguistics: EMNLP 2024",
+    month = nov,
+    year = "2024",
+    address = "Miami, Florida, USA",
+    publisher = "Association for Computational Linguistics",
+    url = "https://aclanthology.org/2024.findings-emnlp.377/",
+    doi = "10.18653/v1/2024.findings-emnlp.377",
+    pages = "6473--6486",
+    abstract = "Modern NLP tasks increasingly rely on dense retrieval methods to access up-to-date and relevant contextual information. We are motivated by the premise that retrieval benefits from segments that can vary in size such that a content{'}s semantic independence is better captured. We propose LumberChunker, a method leveraging an LLM to dynamically segment documents, which iteratively prompts the LLM to identify the point within a group of sequential passages where the content begins to shift. To evaluate our method, we introduce GutenQA, a benchmark with 3000 ``needle in a haystack'' type of question-answer pairs derived from 100 public domain narrative books available on Project Gutenberg. Our experiments show that LumberChunker not only outperforms the most competitive baseline by 7.37{\%} in retrieval performance (DCG@20) but also that, when integrated into a RAG pipeline, LumberChunker proves to be more effective than other chunking methods and competitive baselines, such as the Gemini 1.5M Pro."
+}</code></pre>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+
+  <footer class="footer" style="padding: 2rem 0; background-color: #f8f9fa;">
+    <div class="container">
+      <div class="content has-text-centered">
+        <p>
+          This website is licensed under a <a rel="license" href="https://creativecommons.org/licenses/by-sa/4.0/">Creative Commons Attribution-ShareAlike 4.0 International License</a>.
+        </p>
+        <p>
+          Website template adapted from <a href="https://github.com/nerfies/nerfies.github.io">Nerfies</a>.
+        </p>
+      </div>
+    </div>
+  </footer>
+
+  <script>
+    // D3.js Image and Chart Rendering
+    
+    // Function to render pipeline image using d3.js
+    function renderPipelineImage() {
+      const container = d3.select('#pipeline-image-wrapper');
+      container.selectAll('*').remove();
+      
+      const svg = container.append('svg')
+        .attr('width', '100%')
+        .attr('height', 'auto')
+        .style('max-width', '80%')
+        .style('border-radius', '8px')
+        .style('display', 'block')
+        .style('margin', '0 auto');
+      
+      const img = new Image();
+      img.onload = function() {
+        const imgWidth = this.width;
+        const imgHeight = this.height;
+        
+        svg.attr('viewBox', `0 0 ${imgWidth} ${imgHeight}`)
+           .attr('preserveAspectRatio', 'xMidYMid meet');
+        
+        // Add the image
+        svg.append('image')
+          .attr('href', 'LumberChunker_pipeline.png')
+          .attr('x', 0)
+          .attr('y', 0)
+          .attr('width', imgWidth)
+          .attr('height', imgHeight);
+        
+        // Define clickable areas for each pipeline step
+        // Precisely matched to the vertical dividers in the pipeline image
+        const clickableAreas = [
+          {
+            // Step 1: Document i Paragraph Extraction (leftmost section)
+            x: imgWidth * 0.01,
+            y: 0,
+            width: imgWidth * 0.20, // First vertical line divider
+            height: imgHeight,
+            targetId: 'step1-extraction',
+            section: 'Document i Paragraph Extraction'
+          },
+          {
+            // Step 2: IDs Grouping (Gi) for LLM (second section)
+            x: imgWidth * 0.21,
+            y: 0,
+            width: imgWidth * 0.30, // Largest section with the grouping boxes
+            height: imgHeight,
+            targetId: 'step2-grouping',
+            section: 'IDs Grouping (Gi) for LLM'
+          },
+          {
+            // Step 3: Gemini Query (third section with Google logo)
+            x: imgWidth * 0.54,
+            y: 0,
+            width: imgWidth * 0.24, // Section with Gemini Query text
+            height: imgHeight,
+            targetId: 'step3-query',
+            section: 'Gemini Query'
+          },
+          {
+            // Step 4: Answer Extraction (rightmost section)
+            x: imgWidth * 0.79,
+            y: 0,
+            width: imgWidth * 0.19, // Final section with answer IDs
+            height: imgHeight,
+            targetId: 'step3-query', // Links to step 3 section as step 4 is within the same example box
+            section: 'Answer Extraction'
+          }
+        ];
+        
+        // Add clickable rectangles with hover effects
+        clickableAreas.forEach((area, index) => {
+          const group = svg.append('g')
+            .style('cursor', 'pointer');
+          
+          // Invisible clickable rectangle
+          const rect = group.append('rect')
+            .attr('x', area.x)
+            .attr('y', area.y)
+            .attr('width', area.width)
+            .attr('height', area.height)
+            .attr('fill', 'transparent')
+            .attr('stroke', 'none')
+            .on('click', function() {
+              // Smooth scroll to the corresponding section header
+              const targetElement = document.querySelector(`#${area.targetId}`);
+              if (targetElement) {
+                const elementTop = targetElement.getBoundingClientRect().top + window.pageYOffset;
+                window.scrollTo({
+                  top: elementTop - 120, // Offset for fixed header
+                  behavior: 'smooth'
+                });
+              }
+            })
+            .on('mouseover', function() {
+              // Add highlight overlay on hover
+              d3.select(this)
+                .attr('fill', '#ffa726')
+                .attr('fill-opacity', 0.15)
+                .attr('stroke', '#ff9800')
+                .attr('stroke-width', 4)
+                .attr('stroke-dasharray', '8,4');
+              
+              // Show tooltip with section name
+              const tooltipGroup = svg.append('g')
+                .attr('class', `tooltip-${index}`)
+                .style('pointer-events', 'none');
+              
+              // Calculate responsive font size based on image dimensions (much larger)
+              const fontSize = Math.max(60, Math.min(40, imgWidth * 0.03));
+              const centerX = area.x + area.width / 2;
+              const centerY = imgHeight / 2;
+              
+              // Add text first to get its dimensions
+              const tooltipText = tooltipGroup.append('text')
+                .attr('x', centerX)
+                .attr('y', centerY)
+                .attr('text-anchor', 'middle')
+                .attr('dominant-baseline', 'middle')
+                .style('font-size', `${fontSize}px`)
+                .style('font-weight', '600')
+                .style('fill', '#ff6f00')
+                .style('font-family', "'Roboto', sans-serif")
+                .text('Go To Section');
+              
+              // Get text bounding box for background
+              const bbox = tooltipText.node().getBBox();
+              const padding = 8;
+              
+              // Add background rectangle behind text (insert before text)
+              const tooltipBg = tooltipGroup.insert('rect', 'text')
+                .attr('x', bbox.x - padding)
+                .attr('y', bbox.y - padding)
+                .attr('width', bbox.width + padding * 2)
+                .attr('height', bbox.height + padding * 2)
+                .attr('rx', 6)
+                .attr('ry', 6)
+                .attr('fill', 'rgba(255, 255, 255, 0.95)')
+                .attr('stroke', '#ffa726')
+                .attr('stroke-width', 2)
+                .style('filter', 'none');
+            })
+            .on('mouseout', function() {
+              // Remove highlight
+              d3.select(this)
+                .attr('fill', 'transparent')
+                .attr('fill-opacity', 0)
+                .attr('stroke', 'none');
+              
+              // Remove tooltip
+              svg.selectAll(`.tooltip-${index}`).remove();
+            });
+        });
+      };
+      img.src = 'LumberChunker_pipeline.png';
+    }
+
+    // Function to interpolate DCG values for any theta
+    function interpolateDCGData(theta) {
+      // Known data points
+      const knownThetas = [450, 550, 650, 1000];
+      const knownData = {
+        450: [
+          { k: 1, dcg: 0.47 },
+          { k: 2, dcg: 0.533 },
+          { k: 5, dcg: 0.576 },
+          { k: 10, dcg: 0.595 },
+          { k: 20, dcg: 0.606 }
+        ],
+        550: [
+          { k: 1, dcg: 0.483 },
+          { k: 2, dcg: 0.549 },
+          { k: 5, dcg: 0.594 },
+          { k: 10, dcg: 0.610 },
+          { k: 20, dcg: 0.621 }
+        ],
+        650: [
+          { k: 1, dcg: 0.447 },
+          { k: 2, dcg: 0.518 },
+          { k: 5, dcg: 0.565 },
+          { k: 10, dcg: 0.583 },
+          { k: 20, dcg: 0.596 }
+        ],
+        1000: [
+          { k: 1, dcg: 0.420 },
+          { k: 2, dcg: 0.487 },
+          { k: 5, dcg: 0.538 },
+          { k: 10, dcg: 0.562 },
+          { k: 20, dcg: 0.573 }
+        ]
+      };
+
+      // If theta is exactly a known value, return it directly
+      if (knownData[theta]) {
+        return knownData[theta];
+      }
+
+      // Find bracketing theta values
+      let lowerTheta = knownThetas[0];
+      let upperTheta = knownThetas[knownThetas.length - 1];
+      
+      for (let i = 0; i < knownThetas.length - 1; i++) {
+        if (theta >= knownThetas[i] && theta <= knownThetas[i + 1]) {
+          lowerTheta = knownThetas[i];
+          upperTheta = knownThetas[i + 1];
+          break;
+        }
+      }
+
+      // Linear interpolation
+      const t = (theta - lowerTheta) / (upperTheta - lowerTheta);
+      const lowerData = knownData[lowerTheta];
+      const upperData = knownData[upperTheta];
+
+      return lowerData.map((point, i) => ({
+        k: point.k,
+        dcg: point.dcg + t * (upperData[i].dcg - point.dcg)
+      }));
+    }
+
+    // Function to render DCG line chart showing different theta values
+    function renderDCGChart() {
+      const container = d3.select('#dcg-image-wrapper');
+      container.selectAll('*').remove();
+      
+      // Get initial theta value from slider
+      const slider = document.getElementById('theta-slider');
+      const thetaValueDisplay = document.getElementById('theta-value');
+      const thetaValues = [450, 550, 650, 1000];
+      let currentTheta = thetaValues[parseInt(slider.value)];
+      
+      // Dimensions - increased size with extra top margin for labels
+      const margin = { top: 70, right: 50, bottom: 70, left: 95 };
+      const width = 1100 - margin.left - margin.right;
+      const height = 650 - margin.top - margin.bottom;
+      
+      // Create SVG
+      const svg = container.append('svg')
+        .attr('width', '100%')
+        .attr('height', '100%')
+        .attr('viewBox', `0 0 ${width + margin.left + margin.right} ${height + margin.top + margin.bottom}`)
+        .attr('preserveAspectRatio', 'xMidYMid meet')
+        .style('max-width', '95%')
+        .style('display', 'block')
+        .style('margin', '0 auto')
+        .style('background-color', 'white')
+        .style('border-radius', '8px')
+        .style('box-shadow', 'none');
+      
+      const g = svg.append('g')
+        .attr('transform', `translate(${margin.left},${margin.top})`);
+      
+      // Scales
+      const x = d3.scaleLinear()
+        .domain([1, 20])
+        .range([0, width]);
+      
+      const y = d3.scaleLinear()
+        .domain([0.40, 0.665]) // reduced buffer zone by half
+        .range([height, 0]);
+      
+      // Grid lines (disco style)
+      // Horizontal grid lines
+      const yTicks = y.ticks(6).filter(t => t !== y.domain()[0] && t !== y.domain()[1]);
+      g.append('g')
+        .attr('class', 'grid horizontal-grid')
+        .selectAll('line')
+        .data(yTicks)
+        .join('line')
+        .attr('x1', 0)
+        .attr('x2', width)
+        .attr('y1', d => y(d))
+        .attr('y2', d => y(d))
+        .attr('stroke', 'lightgray')
+        .attr('stroke-dasharray', '5')
+        .attr('stroke-width', 2);
+      
+      // Vertical grid lines
+      const xTicks = [1, 2, 5, 10, 20];
+      g.append('g')
+        .attr('class', 'grid vertical-grid')
+        .selectAll('line')
+        .data(xTicks)
+        .join('line')
+        .attr('x1', d => x(d))
+        .attr('x2', d => x(d))
+        .attr('y1', 0)
+        .attr('y2', height)
+        .attr('stroke', 'lightgray')
+        .attr('stroke-dasharray', '5')
+        .attr('stroke-width', 2);
+      
+      // Axes with black borders
+      const xAxis = g.append('g')
+        .attr('transform', `translate(0,${height})`)
+        .call(d3.axisBottom(x).tickValues([1, 2, 5, 10, 20]).tickFormat(d => d).tickSize(0).tickSizeOuter(0).tickPadding(12))
+        .style('font-size', '22px');
+      
+      xAxis.selectAll('text')
+        .style('fill', '#464646')
+        .style('font-weight', '500')
+        .style('font-family', "'Roboto', sans-serif");
+      
+      // Remove the x-axis domain line
+      xAxis.select('.domain').remove();
+      
+      const yAxis = g.append('g')
+        .call(d3.axisLeft(y).ticks(6).tickFormat(d => d.toFixed(2)).tickSize(0).tickSizeOuter(0).tickPadding(12))
+        .style('font-size', '22px');
+      
+      yAxis.selectAll('text')
+        .style('fill', '#464646')
+        .style('font-weight', '500')
+        .style('font-family', "'Roboto', sans-serif");
+      
+      // Remove the y-axis domain line
+      yAxis.select('.domain').remove();
+      
+      // Add border frame (disco style)
+      // Top border (light grey)
+      g.append('line')
+        .attr('x1', 0)
+        .attr('x2', width)
+        .attr('y1', 0)
+        .attr('y2', 0)
+        .attr('stroke', 'lightgray')
+        .attr('stroke-width', 2);
+      
+      // Right border (light grey)
+      g.append('line')
+        .attr('x1', width)
+        .attr('x2', width)
+        .attr('y1', 0)
+        .attr('y2', height)
+        .attr('stroke', 'lightgray')
+        .attr('stroke-width', 2);
+      
+      // Left border (dark)
+      g.append('line')
+        .attr('x1', 0)
+        .attr('x2', 0)
+        .attr('y1', 0)
+        .attr('y2', height)
+        .attr('stroke', '#36454F')
+        .attr('stroke-width', 2);
+      
+      // Bottom border (dark)
+      g.append('line')
+        .attr('x1', 0)
+        .attr('x2', width)
+        .attr('y1', height)
+        .attr('y2', height)
+        .attr('stroke', '#36454F')
+        .attr('stroke-width', 2);
+      
+      // Axis labels
+      svg.append('text')
+        .attr('x', (width + margin.left + margin.right) / 2)
+        .attr('y', height + margin.top + 55)
+        .attr('text-anchor', 'middle')
+        .style('font-size', '26px')
+        .style('font-weight', '600')
+        .style('fill', '#464646')
+        .style('font-family', "'Roboto', sans-serif")
+        .text('k');
+      
+      svg.append('text')
+        .attr('transform', 'rotate(-90)')
+        .attr('x', -(height + margin.top + margin.bottom) / 2 + 30)
+        .attr('y', 20)
+        .attr('text-anchor', 'middle')
+        .style('font-size', '26px')
+        .style('font-weight', '600')
+        .style('fill', '#464646')
+        .style('font-family', "'Roboto', sans-serif")
+        .text('DCG');
+      
+      // Line generator
+      const line = d3.line()
+        .x(d => x(d.k))
+        .y(d => y(d.dcg))
+        .curve(d3.curveMonotoneX);
+      
+      // All reference theta values to show as transparent lines
+      const referenceThetaValues = [
+        { theta: 450, color: '#1e88e5', dashArray: '4,2' },
+        { theta: 550, color: '#ffa726', dashArray: '8,4' },
+        { theta: 650, color: '#26a69a', dashArray: '6,3' },
+        { theta: 1000, color: '#ff7043', dashArray: '2,3' }
+      ];
+      
+      // Set initial color to match the theta value
+      const initialSliderIndex = parseInt(slider.value);
+      thetaValueDisplay.style.color = referenceThetaValues[initialSliderIndex].color;
+      
+      // Create a group for all reference lines
+      const referenceLinesGroup = g.append('g').attr('class', 'reference-lines-group');
+      
+      // Draw all reference lines as transparent
+      referenceThetaValues.forEach((refConfig, index) => {
+        const refData = interpolateDCGData(refConfig.theta);
+        
+        // Reference line
+        const refLine = referenceLinesGroup.append('path')
+          .datum(refData)
+          .attr('class', `reference-line-${refConfig.theta}`)
+          .attr('fill', 'none')
+          .attr('stroke', refConfig.color)
+          .attr('stroke-width', 2)
+          .attr('stroke-dasharray', refConfig.dashArray)
+          .attr('opacity', 0.2)
+          .attr('d', line);
+        
+        // Reference markers
+        referenceLinesGroup.selectAll(`.reference-marker-${refConfig.theta}`)
+          .data(refData)
+          .join('circle')
+          .attr('class', `reference-marker-${refConfig.theta}`)
+          .attr('cx', d => x(d.k))
+          .attr('cy', d => y(d.dcg))
+          .attr('r', 3)
+          .attr('fill', 'white')
+          .attr('stroke', refConfig.color)
+          .attr('stroke-width', 1.5)
+          .attr('opacity', 0.2);
+      });
+      
+      // Active line (changes with slider)
+      const activeLine = g.append('path')
+        .attr('class', 'active-line')
+        .attr('fill', 'none')
+        .attr('stroke', referenceThetaValues[initialSliderIndex].color)
+        .attr('stroke-width', 3)
+        .attr('d', line(interpolateDCGData(currentTheta)));
+      
+      // Active markers
+      const activeMarkersGroup = g.append('g').attr('class', 'active-markers-group');
+      
+      function updateActiveMarkers(theta, color = '#2196F3') {
+        const data = interpolateDCGData(theta);
+        
+        const markers = activeMarkersGroup.selectAll('.active-marker')
+          .data(data);
+        
+        // Exit
+        markers.exit().remove();
+        
+        // Enter + Update
+        const markersEnter = markers.enter()
+          .append('circle')
+          .attr('class', 'active-marker')
+          .attr('r', 5)
+          .attr('fill', 'white')
+          .attr('stroke', color)
+          .attr('stroke-width', 2.5)
+          .style('cursor', 'pointer');
+        
+        markers.merge(markersEnter)
+          .transition()
+          .duration(300)
+          .attr('cx', d => x(d.k))
+          .attr('cy', d => y(d.dcg))
+          .attr('stroke', color);
+        
+        // Hover effects
+        activeMarkersGroup.selectAll('.active-marker')
+          .on('mouseover', function(event, d) {
+            d3.select(this)
+              .transition()
+              .duration(150)
+              .attr('r', 7);
+            
+            // Show tooltip
+            const tooltip = g.append('text')
+              .attr('class', 'dcg-tooltip')
+              .attr('x', x(d.k))
+              .attr('y', y(d.dcg) - 15)
+              .attr('text-anchor', 'middle')
+              .style('font-size', '17px')
+              .style('font-weight', '700')
+              .style('fill', color)
+              .style('font-family', "'Roboto', sans-serif")
+              .text(`θ=${theta}: ${d.dcg.toFixed(3)}`);
+          })
+          .on('mouseout', function() {
+            d3.select(this)
+              .transition()
+              .duration(150)
+              .attr('r', 5);
+            
+            g.selectAll('.dcg-tooltip').remove();
+          });
+      }
+      
+      // Initial markers
+      updateActiveMarkers(currentTheta, referenceThetaValues[initialSliderIndex].color);
+      
+  // Add labels at the top of the chart in legend format
+      const legendGroup = g.append('g').attr('class', 'line-labels-group');
+      
+      // Store references to legend text elements for updating
+      const legendTexts = [];
+      
+  // Calculate spacing for horizontal legend (increased for larger labels)
+  const legendSpacing = 200;
+      const legendStartX = (width - (referenceThetaValues.length - 1) * legendSpacing) / 2;
+      
+      // Reference theta labels positioned at the top with symbols
+      referenceThetaValues.forEach((refConfig, i) => {
+        const labelGroup = legendGroup.append('g')
+          .attr('class', `label-${refConfig.theta}`);
+        
+        const labelX = legendStartX + (i * legendSpacing);
+        
+        // Add line segment as symbol (no pattern, extends both sides around the circle like -o-)
+        const centerX = labelX - 12.5; // circle center
+        const symbolY = -38;
+        const halfLen = 15; // shorter length to avoid text overlap
+        labelGroup.append('line')
+          .attr('x1', centerX - halfLen)
+          .attr('x2', centerX + halfLen)
+          .attr('y1', symbolY)
+          .attr('y2', symbolY)
+          .attr('stroke', refConfig.color)
+          .attr('stroke-width', 6);
+        
+        // Add circle marker (ring style so line is visible through it)
+        const symbolCircle = labelGroup.append('circle')
+          .attr('cx', centerX)
+          .attr('cy', symbolY)
+          .attr('r', 7)
+          .attr('fill', 'white')
+          .attr('stroke', refConfig.color)
+          .attr('stroke-width', 5);
+        
+        const labelText = labelGroup.append('text')
+          .attr('x', labelX + 8)
+          .attr('y', symbolY)
+          .attr('dy', '0.35em')
+          .attr('text-anchor', 'start')
+          .style('font-family', "'Roboto', sans-serif")
+          .style('font-size', '24px')
+          .style('font-weight', refConfig.theta === currentTheta ? '700' : '400')
+          .style('fill', '#424242')
+          .text(`θ=${refConfig.theta}`);
+        
+        // Store reference for updating
+        legendTexts.push({ element: labelText, theta: refConfig.theta });
+      });
+      
+      // Slider interaction - map slider positions to predefined theta values
+      slider.addEventListener('input', function() {
+        const sliderIndex = parseInt(this.value);
+        const newTheta = thetaValues[sliderIndex];
+        const newColor = referenceThetaValues[sliderIndex].color;
+        currentTheta = newTheta;
+        thetaValueDisplay.textContent = newTheta;
+        thetaValueDisplay.style.color = newColor;
+        
+        // Update slider markers
+        document.querySelectorAll('.slider-marker').forEach((marker, idx) => {
+          const circle = marker.querySelector('div');
+          if (idx === sliderIndex) {
+            circle.style.backgroundColor = '#424242';
+          } else {
+            circle.style.backgroundColor = 'white';
+          }
+        });
+        
+        // Update the active line
+        const newData = interpolateDCGData(newTheta);
+        
+        // Interrupt any ongoing transitions and clear dasharray
+        activeLine
+          .interrupt()
+          .attr('stroke-dasharray', 'none')
+          .attr('stroke-dashoffset', 0);
+        
+        // Now transition to the new line
+        activeLine
+          .transition()
+          .duration(300)
+          .attr('d', line(newData))
+          .attr('stroke', newColor);
+        
+        // Update markers
+        updateActiveMarkers(newTheta, newColor);
+        
+        // Update legend - bold the selected theta value
+        legendTexts.forEach(({ element, theta }) => {
+          const isSelected = theta === newTheta;
+          element
+            .style('font-weight', isSelected ? '700' : '400')
+            .style('opacity', isSelected ? 1 : 0.7);
+        });
+      });
+      
+      // Set up Intersection Observer for scroll-triggered animation
+      const dcgWrapper = document.getElementById('dcg-image-wrapper');
+      let hasAnimatedDCG = false;
+      
+      const dcgObserver = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+          if (entry.isIntersecting && !hasAnimatedDCG) {
+            hasAnimatedDCG = true;
+            
+            // Animate all reference lines
+            referenceThetaValues.forEach((refConfig, index) => {
+              const refLine = referenceLinesGroup.select(`.reference-line-${refConfig.theta}`);
+              const refPath = refLine.node();
+              const refLength = refPath.getTotalLength();
+              
+              refLine
+                .attr('stroke-dasharray', `${refConfig.dashArray},${refLength}`)
+                .attr('stroke-dashoffset', refLength)
+                .transition()
+                .duration(1500)
+                .delay(index * 150)
+                .ease(d3.easeQuadInOut)
+                .attr('stroke-dashoffset', 0)
+                .on('end', function() {
+                  d3.select(this).attr('stroke-dasharray', refConfig.dashArray);
+                });
+              
+              // Animate reference markers
+              referenceLinesGroup.selectAll(`.reference-marker-${refConfig.theta}`)
+                .attr('opacity', 0)
+                .transition()
+                .delay(1500 + index * 150)
+                .duration(400)
+                .attr('opacity', 0.2);
+            });
+            
+            // Animate active line
+            const activePath = activeLine.node();
+            const activeLength = activePath.getTotalLength();
+            
+            activeLine
+              .attr('stroke-dasharray', activeLength)
+              .attr('stroke-dashoffset', activeLength)
+              .transition()
+              .duration(1800)
+              .delay(800)
+              .ease(d3.easeQuadInOut)
+              .attr('stroke-dashoffset', 0)
+              .on('end', function() {
+                d3.select(this).attr('stroke-dasharray', 'none');
+              });
+            
+            // Animate active markers
+            activeMarkersGroup.selectAll('.active-marker')
+              .attr('opacity', 0)
+              .transition()
+              .delay((d, i) => 2600 + i * 150)
+              .duration(400)
+              .attr('opacity', 1);
+            
+            // Animate legend
+            legendGroup
+              .attr('opacity', 0)
+              .transition()
+              .delay(3000)
+              .duration(600)
+              .attr('opacity', 1);
+          }
+        });
+      }, {
+        threshold: 0.3,
+        rootMargin: '0px'
+      });
+      
+      if (dcgWrapper) {
+        dcgObserver.observe(dcgWrapper);
+      }
+    }
+
+    // Function to render QA Accuracy bar chart
+    function renderQAChart() {
+      const container = d3.select('#qa-image-wrapper');
+      container.selectAll('*').remove();
+      
+      // Data: QA Accuracy percentages with descriptions
+      const data = [
+        { 
+          method: 'Closed-Book', 
+          accuracy: 26.43, 
+          color: '#FF6B6B', 
+          label: 'Closed-Book',
+          description: 'No context given. Model answers from pre-trained knowledge only.'
+        },
+        { 
+          method: 'Open-Book', 
+          accuracy: 37.76, 
+          color: '#4ECDC4', 
+          label: 'Open-Book',
+          description: 'Full document provided. Model can reference any part of the text.'
+        },
+        { 
+          method: 'RAG - Recursive Chunks', 
+          accuracy: 84.96, 
+          color: '#45B7D1', 
+          label: 'RAG - Recursive Chunks',
+          description: 'Documents split at fixed token boundaries, then relevant chunks retrieved.'
+        },
+        { 
+          method: 'RAG - LumberChunker', 
+          accuracy: 88.89, 
+          color: '#96CEB4', 
+          label: 'RAG - LumberChunker',
+          description: 'Documents segmented at semantic boundaries by LLM for better context.'
+        },
+        { 
+          method: 'RAG - Manual Chunks', 
+          accuracy: 90.53, 
+          color: '#FFEAA7', 
+          label: 'RAG - Manual Chunks',
+          description: 'Human experts segment at natural topic boundaries (gold standard).'
+        }
+      ];
+      
+      // Dimensions - increased size
+      const margin = { top: 80, right: 60, bottom: 120, left: 120 };
+      const width = 1600 - margin.left - margin.right;
+      const height = 800 - margin.top - margin.bottom;
+      
+      // Create SVG
+      const svg = container.append('svg')
+        .attr('width', '100%')
+        .attr('height', '100%')
+        .attr('viewBox', `0 0 ${width + margin.left + margin.right} ${height + margin.top + margin.bottom}`)
+        .attr('preserveAspectRatio', 'xMidYMid meet')
+        .style('max-width', '95%')
+        .style('display', 'block')
+        .style('margin', '0 auto')
+        .style('background-color', 'white')
+        .style('border-radius', '8px')
+        .style('box-shadow', 'none');
+      
+      const g = svg.append('g')
+        .attr('transform', `translate(${margin.left},${margin.top})`);
+      
+      // Tooltip group for click interactions
+      let activeTooltip = null;
+      
+      // Scales
+      const x = d3.scaleBand()
+        .domain(data.map((d, i) => i))
+        .range([0, width])
+        .padding(0.4);
+      
+      const y = d3.scaleLinear()
+        .domain([0, 105]) // up to 105% for buffer zone like disco
+        .range([height, 0]);
+      
+      // Dashed grid lines in background (disco style)
+      const yTicksQA = y.ticks(5).filter(t => t !== 0);
+      g.append('g')
+        .attr('class', 'grid horizontal-grid')
+        .selectAll('line')
+        .data(yTicksQA)
+        .join('line')
+        .attr('x1', 0)
+        .attr('x2', width)
+        .attr('y1', d => y(d))
+        .attr('y2', d => y(d))
+        .attr('stroke', 'lightgray')
+        .attr('stroke-width', 2)
+        .attr('stroke-dasharray', '5');
+      
+      // Axes with borders
+      const xAxis = g.append('g')
+        .attr('transform', `translate(0,${height})`)
+        .call(d3.axisBottom(x).tickFormat(() => '').tickSize(0).tickSizeOuter(0));
+      
+      xAxis.select('.domain').remove();
+      xAxis.selectAll('.tick').remove();
+      
+      const yAxis = g.append('g')
+        .call(d3.axisLeft(y).ticks(5).tickFormat(d => d).tickSize(0).tickSizeOuter(0).tickPadding(12));
+      
+      yAxis.selectAll('text')
+        .style('fill', '#464646')
+        .style('font-size', '28px')
+        .style('font-weight', '500')
+        .style('font-family', "'Roboto', sans-serif");
+      
+      yAxis.select('.domain').remove();
+      
+      // Borders (disco style)
+      // Top border (light grey)
+      g.append('line')
+        .attr('x1', 0)
+        .attr('x2', width)
+        .attr('y1', 0)
+        .attr('y2', 0)
+        .attr('stroke', 'lightgray')
+        .attr('stroke-width', 2);
+      
+      // Right border (light grey)
+      g.append('line')
+        .attr('x1', width)
+        .attr('x2', width)
+        .attr('y1', 0)
+        .attr('y2', height)
+        .attr('stroke', 'lightgray')
+        .attr('stroke-width', 2);
+      
+      // Left border (dark)
+      g.append('line')
+        .attr('x1', 0)
+        .attr('x2', 0)
+        .attr('y1', 0)
+        .attr('y2', height)
+        .attr('stroke', '#36454F')
+        .attr('stroke-width', 2);
+      
+      // Bottom border (dark)
+      g.append('line')
+        .attr('x1', 0)
+        .attr('x2', width)
+        .attr('y1', height)
+        .attr('y2', height)
+        .attr('stroke', '#36454F')
+        .attr('stroke-width', 2);
+      
+      // Axis label
+      svg.append('text')
+        .attr('transform', 'rotate(-90)')
+        .attr('x', -(height + margin.top + margin.bottom) / 2 + 30)
+        .attr('y', 45)
+        .attr('text-anchor', 'middle')
+        .style('font-size', '32px')
+        .style('font-weight', '600')
+        .style('font-family', "'Roboto', sans-serif")
+        .style('fill', '#464646')
+        .text('Accuracy (%)');
+      
+      // Draw bars (without animation initially)
+      let isAnimating = false;
+      
+      const bars = g.selectAll('.bar')
+        .data(data)
+        .join('rect')
+        .attr('class', 'bar')
+        .attr('x', (d, i) => x(i))
+        .attr('y', height)
+        .attr('width', x.bandwidth())
+        .attr('height', 0)
+        .attr('fill', d => d.color)
+        .attr('stroke', '#000')
+        .attr('stroke-width', 1.5)
+        .attr('opacity', 0.7)
+        .style('cursor', 'pointer')
+        .on('mouseover', function(event, d) {
+          // Only allow hover effect if not currently animating
+          if (!isAnimating) {
+            d3.select(this)
+              .transition()
+              .duration(200)
+              .attr('opacity', 0.5);
+          }
+        })
+        .on('mouseout', function() {
+          // Only allow hover effect if not currently animating
+          if (!isAnimating) {
+            d3.select(this)
+              .transition()
+              .duration(200)
+              .attr('opacity', 0.7);
+          }
+        })
+        .on('click', function(event, d) {
+          event.stopPropagation();
+          
+          // Remove existing tooltip if any
+          if (activeTooltip) {
+            activeTooltip.remove();
+            activeTooltip = null;
+          }
+          
+          // Get bar position
+          const barIndex = data.indexOf(d);
+          const barX = x(barIndex);
+          const barY = y(d.accuracy);
+          
+          // Create tooltip group
+          const tooltip = g.append('g')
+            .attr('class', 'info-tooltip')
+            .style('pointer-events', 'all');
+          
+          activeTooltip = tooltip;
+          
+          // Tooltip dimensions
+          const padding = 20;
+          const maxTooltipWidth = 400;
+          const lineHeight = 24;
+          
+          // Create temporary text to measure title width
+          const tempTitle = tooltip.append('text')
+            .style('font-size', '26px')
+            .style('font-weight', '600')
+            .style('font-family', "'Roboto', sans-serif")
+            .style('visibility', 'hidden')
+            .text(d.label);
+          const titleWidth = tempTitle.node().getComputedTextLength();
+          tempTitle.remove();
+          
+          // Calculate tooltip width based on content
+          const tooltipWidth = Math.min(Math.max(titleWidth + 2 * padding + 30, 320), maxTooltipWidth);
+          const maxWidth = tooltipWidth - 2 * padding;
+          
+          // Calculate wrapped text lines to determine height
+          const words = d.description.split(' ');
+          let line = '';
+          let lineCount = 0;
+          const tempText = tooltip.append('text')
+            .style('font-size', '22px')
+            .style('font-family', "'Roboto', sans-serif")
+            .style('visibility', 'hidden');
+          
+          words.forEach((word, i) => {
+            const testLine = line + word + ' ';
+            tempText.text(testLine);
+            const testWidth = tempText.node().getComputedTextLength();
+            
+            if (testWidth > maxWidth && line !== '') {
+              lineCount++;
+              line = word + ' ';
+            } else {
+              line = testLine;
+            }
+            
+            if (i === words.length - 1) {
+              lineCount++;
+            }
+          });
+          tempText.remove();
+          
+          // Calculate tooltip height based on number of lines
+          const tooltipHeight = padding * 2 + 14 + 28 + (lineCount * lineHeight);
+          
+          // Position tooltip to the right of the bar, or left if near edge
+          let tooltipX = barX + x.bandwidth() + 15;
+          if (tooltipX + tooltipWidth > width) {
+            tooltipX = barX - tooltipWidth - 15;
+          }
+          let tooltipY = barY - tooltipHeight / 2;
+          if (tooltipY < 0) tooltipY = 10;
+          if (tooltipY + tooltipHeight > height) tooltipY = height - tooltipHeight - 10;
+          
+          // Tooltip background
+          const bgRect = tooltip.append('rect')
+            .attr('x', tooltipX)
+            .attr('y', tooltipY)
+            .attr('width', tooltipWidth)
+            .attr('height', tooltipHeight)
+            .attr('fill', 'white')
+            .attr('stroke', d.color)
+            .attr('stroke-width', 2.5)
+            .attr('rx', 6)
+            .style('filter', 'none')
+            .attr('opacity', 0);
+          
+          bgRect.transition()
+            .duration(200)
+            .attr('opacity', 1);
+          
+          // Close button - better positioned
+          const closeBtn = tooltip.append('g')
+            .attr('transform', `translate(${tooltipX + tooltipWidth - 24}, ${tooltipY + 14})`)
+            .style('cursor', 'pointer')
+            .attr('opacity', 0)
+            .on('click', function(e) {
+              e.stopPropagation();
+              tooltip.transition().duration(150).attr('opacity', 0).remove();
+              activeTooltip = null;
+            });
+          
+          closeBtn.append('circle')
+            .attr('r', 10)
+            .attr('fill', '#e0e0e0');
+          
+          closeBtn.append('text')
+            .attr('text-anchor', 'middle')
+            .attr('dy', '0.35em')
+            .style('font-size', '16px')
+            .style('font-weight', 'bold')
+            .style('fill', '#424242')
+            .text('×');
+          
+          closeBtn.transition().duration(200).attr('opacity', 1);
+          
+          // Tooltip title - larger font
+          tooltip.append('text')
+            .attr('x', tooltipX + padding)
+            .attr('y', tooltipY + padding + 14)
+            .style('font-size', '26px')
+            .style('font-weight', '600')
+            .style('font-family', "'Roboto', sans-serif")
+            .style('fill', '#464646')
+            .attr('opacity', 0)
+            .text(d.label)
+            .transition()
+            .duration(200)
+            .attr('opacity', 1);
+          
+          // Tooltip description (wrapped text) - larger font
+          line = '';
+          let lineNumber = 0;
+          const textY = tooltipY + padding + 42;
+          
+          words.forEach((word, i) => {
+            const testLine = line + word + ' ';
+            const testText = tooltip.append('text')
+              .attr('x', tooltipX + padding)
+              .attr('y', textY)
+              .style('font-size', '22px')
+              .style('font-family', "'Roboto', sans-serif")
+              .text(testLine);
+            
+            const testWidth = testText.node().getComputedTextLength();
+            testText.remove();
+            
+            if (testWidth > maxWidth && line !== '') {
+              tooltip.append('text')
+                .attr('x', tooltipX + padding)
+                .attr('y', textY + lineNumber * lineHeight)
+                .style('font-size', '22px')
+                .style('font-family', "'Roboto', sans-serif")
+                .style('fill', '#666')
+                .attr('opacity', 0)
+                .text(line.trim())
+                .transition()
+                .duration(200)
+                .attr('opacity', 1);
+              
+              line = word + ' ';
+              lineNumber++;
+            } else {
+              line = testLine;
+            }
+            
+            // Last word
+            if (i === words.length - 1) {
+              tooltip.append('text')
+                .attr('x', tooltipX + padding)
+                .attr('y', textY + lineNumber * lineHeight)
+                .style('font-size', '22px')
+                .style('font-family', "'Roboto', sans-serif")
+                .style('fill', '#666')
+                .attr('opacity', 0)
+                .text(line.trim())
+                .transition()
+                .duration(200)
+                .attr('opacity', 1);
+            }
+          });
+        });
+      
+      // Add value labels (hidden initially)
+      const labels = g.selectAll('.label')
+        .data(data)
+        .join('text')
+        .attr('class', 'label')
+        .attr('x', (d, i) => x(i) + x.bandwidth() / 2)
+        .attr('y', d => y(d.accuracy) - 10)
+        .attr('text-anchor', 'middle')
+        .style('font-size', '30px')
+        .style('font-weight', 'bold')
+        .style('font-family', "'Roboto', sans-serif")
+        .style('fill', '#333')
+        .attr('opacity', 0)
+        .text(d => d.accuracy.toFixed(2));
+      
+      // Add method labels at bottom of each bar
+      const bottomLabels = g.selectAll('.bottom-label')
+        .data(data)
+        .join('text')
+        .attr('class', 'bottom-label')
+        .attr('x', (d, i) => x(i) + x.bandwidth() / 2)
+        .attr('y', height + 30)
+        .attr('text-anchor', 'middle')
+        .style('font-size', '26px')
+        .style('font-weight', '500')
+        .style('font-family', "'Roboto', sans-serif")
+        .style('fill', '#464646')
+        .each(function(d, i) {
+          const text = d3.select(this);
+          const words = d.label.split(' - ');
+          
+          if (words.length > 1) {
+            // Multi-line label for methods with " - "
+            text.append('tspan')
+              .attr('x', x(i) + x.bandwidth() / 2)
+              .attr('dy', '0')
+              .text(words[0]);
+            text.append('tspan')
+              .attr('x', x(i) + x.bandwidth() / 2)
+              .attr('dy', '1.1em')
+              .text(words[1]);
+          } else {
+            // Single line label
+            text.text(d.label);
+          }
+        });
+      
+      // Add legend in top-left corner
+      const legendGroup = g.append('g')
+        .attr('transform', `translate(30, 30)`)
+        .attr('opacity', 0);
+      
+      // Legend background
+      legendGroup.append('rect')
+        .attr('x', -15)
+        .attr('y', -15)
+        .attr('width', 340)
+        .attr('height', 200)
+        .attr('fill', 'white')
+        .attr('stroke', '#464646')
+        .attr('stroke-width', 2)
+        .attr('rx', 3);
+      
+      // Legend items with compact formatting
+      let yOffset = 12;
+      
+      for (let i = 0; i < data.length; i++) {
+        const d = data[i];
+        const legendRow = legendGroup.append('g')
+          .attr('transform', `translate(5, ${yOffset})`);
+        
+        // Color box
+        legendRow.append('rect')
+          .attr('x', 0)
+          .attr('y', -12)
+          .attr('width', 24)
+          .attr('height', 24)
+          .attr('fill', d.color)
+          .attr('stroke', '#464646')
+          .attr('stroke-width', 1.5);
+        
+        // Single line label for all entries
+        legendRow.append('text')
+          .attr('x', 32)
+          .attr('y', 5)
+          .style('font-size', '24px')
+          .style('font-weight', '500')
+          .style('font-family', "'Roboto', sans-serif")
+          .style('fill', '#464646')
+          .text(d.label);
+        
+        yOffset += 36;
+      }
+      
+      // Set up Intersection Observer for scroll-triggered animation
+      const qaWrapper = document.getElementById('qa-image-wrapper');
+      let hasAnimated = false;
+      
+      const observer = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+          if (entry.isIntersecting && !hasAnimated) {
+            hasAnimated = true;
+            isAnimating = true;
+            
+            // Animate bars sliding up
+            bars.transition()
+              .delay((d, i) => i * 150)
+              .duration(1000)
+              .ease(d3.easeCubicOut)
+              .attr('y', d => y(d.accuracy))
+              .attr('height', d => height - y(d.accuracy))
+              .on('end', function(d, i) {
+                // Re-enable hover effects after the last bar finishes animating
+                if (i === data.length - 1) {
+                  isAnimating = false;
+                }
+              });
+            
+            // Animate labels fading in
+            labels.transition()
+              .delay((d, i) => i * 150 + 800)
+              .duration(500)
+              .attr('opacity', 1);
+            
+            // Animate legend appearance
+            legendGroup.transition()
+              .delay(1200)
+              .duration(600)
+              .attr('opacity', 1);
+          }
+        });
+      }, {
+        threshold: 0.3,
+        rootMargin: '0px'
+      });
+      
+      if (qaWrapper) {
+        observer.observe(qaWrapper);
+      }
+      
+      // Click outside to close tooltip
+      svg.on('click', function(event) {
+        if (activeTooltip && event.target.tagName === 'svg') {
+          activeTooltip.transition().duration(150).attr('opacity', 0).remove();
+          activeTooltip = null;
+        }
+      });
+      
+      g.on('click', function(event) {
+        if (activeTooltip && !event.target.classList.contains('bar')) {
+          activeTooltip.transition().duration(150).attr('opacity', 0).remove();
+          activeTooltip = null;
+        }
+      });
+    }
+
+    // Render all visualizations when DOM is ready
+    document.addEventListener('DOMContentLoaded', function() {
+      renderPipelineImage();
+      renderDCGChart();
+      renderQAChart();
+      
+      // Copy citation button functionality
+      const copyBtn = document.getElementById('copy-citation-btn');
+      const citationText = document.getElementById('citation-text');
+      const btnText = document.getElementById('copy-btn-text');
+      
+      if (copyBtn && citationText) {
+        copyBtn.addEventListener('click', function() {
+          // Get the text content from the citation
+          const textToCopy = citationText.textContent.trim();
+          
+          // Copy to clipboard
+          navigator.clipboard.writeText(textToCopy).then(function() {
+            // Success feedback
+            btnText.textContent = 'Copied!';
+            copyBtn.style.backgroundColor = '#4CAF50';
+            
+            // Reset after 2 seconds
+            setTimeout(function() {
+              btnText.textContent = 'Copy';
+              copyBtn.style.backgroundColor = '#2196F3';
+            }, 2000);
+          }).catch(function(err) {
+            // Fallback for older browsers
+            const textArea = document.createElement('textarea');
+            textArea.value = textToCopy;
+            textArea.style.position = 'fixed';
+            textArea.style.left = '-999999px';
+            document.body.appendChild(textArea);
+            textArea.select();
+            
+            try {
+              document.execCommand('copy');
+              btnText.textContent = 'Copied!';
+              copyBtn.style.backgroundColor = '#4CAF50';
+              
+              setTimeout(function() {
+                btnText.textContent = 'Copy';
+                copyBtn.style.backgroundColor = '#2196F3';
+              }, 2000);
+            } catch (err) {
+              console.error('Failed to copy text: ', err);
+              btnText.textContent = 'Failed';
+              setTimeout(function() {
+                btnText.textContent = 'Copy';
+              }, 2000);
+            }
+            
+            document.body.removeChild(textArea);
+          });
+        });
+      }
+    });
+
+    // Embedded Quiz Functionality
+    const QUIZ_DATA = {
+      passage: [
+        '"What about a story?" I said.',
+        '"Could you very sweetly tell Winnie-the-Pooh one?"',
+        '"I suppose I could," I said. "What sort of stories does he like?"',
+        '"About himself. Because he\'s that sort of Bear."',
+        '"Oh, I see."',
+        '"So could you very sweetly?"',
+        '"I\'ll try," I said.',
+        'So I tried.',
+        'Once upon a time, a very long time ago now, about last Friday, Winnie-the-Pooh lived in a forest all by himself under the name of Sanders.',
+        '"What does \'under the name\' mean?" asked Christopher Robin.'
+      ],
+      options: [
+        {
+          id: 'A',
+          label: 'Split after every sentence (10 chunks)',
+          chunks: [
+            { sentences: [0], name: "Chunk 1" },
+            { sentences: [1], name: "Chunk 2" },
+            { sentences: [2], name: "Chunk 3" },
+            { sentences: [3], name: "Chunk 4" },
+            { sentences: [4], name: "Chunk 5" },
+            { sentences: [5], name: "Chunk 6" },
+            { sentences: [6], name: "Chunk 7" },
+            { sentences: [7], name: "Chunk 8" },
+            { sentences: [8], name: "Chunk 9" },
+            { sentences: [9], name: "Chunk 10" }
+          ],
+          feedback: "This creates too many tiny chunks! Each sentence is isolated, losing the semantic connections between related dialogue. This approach would make retrieval inefficient and fail to capture the conversational flow."
+        },
+        {
+          id: 'B',
+          label: 'Keep everything together (1 chunk)',
+          chunks: [
+            { sentences: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9], name: "Entire Passage" }
+          ],
+          feedback: "This treats the entire passage as one chunk, mixing two distinct sections: the dialogue setup and the story beginning. The shift from meta-conversation to storytelling represents a clear semantic boundary that should be captured."
+        },
+        {
+          id: 'C',
+          label: 'Split between dialogue and story (2 chunks)',
+          chunks: [
+            {
+              sentences: [0, 1, 2, 3, 4, 5, 6, 7],
+              name: "Dialogue Setup",
+              reasoning: "These sentences form a complete dialogue where Christopher Robin asks for a story about Winnie-the-Pooh. They establish the context and setup for what follows, showing the conversational flow from request to agreement."
+            },
+            {
+              sentences: [8, 9],
+              name: "Story Beginning",
+              reasoning: "These sentences transition from the setup dialogue into the actual storytelling. The narrator begins the story with a classic fairy tale opening, immediately followed by Christopher Robin's interruption with a question about the story."
+            }
+          ],
+          feedback: "Correct! This segmentation recognizes the semantic boundary between the meta-dialogue (discussing what story to tell) and the actual storytelling. The first chunk captures the complete request-and-agreement exchange, while the second chunk begins the narrative with its classic opening and immediate interruption.",
+          isCorrect: true
+        }
+      ],
+      correctAnswer: 'C'
+    };
+
+    class EmbeddedQuiz {
+      constructor() {
+        this.selectedOption = null;
+        this.init();
+      }
+
+      init() {
+        this.renderPassage();
+        this.renderOptions();
+        this.setupEventListeners();
+        this.matchHeights();
+      }
+
+      renderPassage() {
+        const container = document.getElementById('passageContainer');
+        container.innerHTML = '';
+        
+        QUIZ_DATA.passage.forEach((sentence, index) => {
+          const p = document.createElement('p');
+          p.className = 'passage-sentence';
+          p.setAttribute('data-id', index);
+          p.textContent = sentence;
+          container.appendChild(p);
+        });
+      }
+
+      renderOptions() {
+        const container = document.getElementById('optionsContainer');
+        container.className = 'options-container';
+        container.innerHTML = '';
+        
+        QUIZ_DATA.options.forEach(option => {
+          const card = document.createElement('div');
+          card.className = 'option-card';
+          card.setAttribute('data-option-id', option.id);
+          
+          const header = document.createElement('div');
+          header.className = 'option-header';
+          
+          const radio = document.createElement('input');
+          radio.type = 'radio';
+          radio.name = 'chunking-option';
+          radio.id = `option-${option.id}`;
+          radio.value = option.id;
+          
+          const label = document.createElement('label');
+          label.setAttribute('for', `option-${option.id}`);
+          label.innerHTML = `<strong>Option ${option.id}:</strong> ${option.label}`;
+          
+          header.appendChild(radio);
+          header.appendChild(label);
+          card.appendChild(header);
+          
+          card.addEventListener('click', () => this.selectOption(option.id));
+          container.appendChild(card);
+        });
+      }
+
+      selectOption(optionId) {
+        this.selectedOption = optionId;
+        
+        // Update visual selection
+        document.querySelectorAll('.option-card').forEach(card => {
+          card.classList.remove('selected');
+        });
+        document.querySelector(`[data-option-id="${optionId}"]`).classList.add('selected');
+        
+        // Update radio button
+        document.querySelectorAll('input[name="chunking-option"]').forEach(radio => {
+          radio.checked = false;
+        });
+        document.getElementById(`option-${optionId}`).checked = true;
+        
+        // Highlight passage chunks
+        this.highlightPassageChunks(optionId);
+      }
+
+      highlightPassageChunks(optionId) {
+        // Clear existing highlights
+        const container = document.getElementById('passageContainer');
+        container.innerHTML = '';
+        
+        const selectedOption = QUIZ_DATA.options.find(opt => opt.id === optionId);
+        if (!selectedOption) return;
+        
+        // Group sentences by chunks and create combined highlights
+        selectedOption.chunks.forEach((chunk, chunkIndex) => {
+          const chunkDiv = document.createElement('div');
+          chunkDiv.className = `chunk-group chunk-${(chunkIndex % 3) + 1}`;
+          
+          chunk.sentences.forEach(sentenceIdx => {
+            const p = document.createElement('p');
+            p.className = 'chunk-sentence';
+            p.textContent = QUIZ_DATA.passage[sentenceIdx];
+            chunkDiv.appendChild(p);
+          });
+          
+          container.appendChild(chunkDiv);
+        });
+      }
+
+      setupEventListeners() {
+        document.getElementById('submitBtn').addEventListener('click', () => {
+          this.submitAnswer();
+        });
+        
+        document.getElementById('backBtn').addEventListener('click', () => {
+          this.resetQuiz();
+        });
+      }
+
+      submitAnswer() {
+        if (!this.selectedOption) {
+          alert('Please select an option before submitting!');
+          return;
+        }
+        
+        this.showSolution();
+      }
+
+      showSolution() {
+        const answerPhase = document.getElementById('answerPhase');
+        const solutionPhase = document.getElementById('solutionPhase');
+        const solutionContent = document.getElementById('solutionContent');
+        
+        const selectedOption = QUIZ_DATA.options.find(opt => opt.id === this.selectedOption);
+        const isCorrect = selectedOption.isCorrect || false;
+        
+        // Build solution content
+        solutionContent.innerHTML = '';
+        
+        // Result header
+        const header = document.createElement('div');
+        header.className = `result-header ${isCorrect ? 'correct' : 'incorrect'}`;
+        header.innerHTML = `
+          <h3>${isCorrect ? 'Correct!' : 'Not Quite'}</h3>
+          <p>${isCorrect ? 'You identified the optimal semantic segmentation!' : 'Let\'s review why this segmentation isn\'t ideal.'}</p>
+        `;
+        solutionContent.appendChild(header);
+        
+        // Your answer section
+        const yourAnswer = document.createElement('div');
+        yourAnswer.innerHTML = `
+          <h4 style="margin-bottom: 15px;">Your Answer: <span style="background-color: #464646; color: white; padding: 4px 12px; border-radius: 4px; font-weight: 600;">Option ${this.selectedOption}</span></h4>
+          <div class="feedback-box">${selectedOption.feedback}</div>
+        `;
+        solutionContent.appendChild(yourAnswer);
+        
+        // Show optimal segmentation (always show correct answer)
+        const correctOption = QUIZ_DATA.options.find(opt => opt.id === QUIZ_DATA.correctAnswer);
+        if (!isCorrect) {
+          const correctSection = document.createElement('div');
+          correctSection.style.marginTop = '25px';
+          correctSection.innerHTML = `
+            <h4 style="margin-bottom: 15px;">Correct Answer: <span style="background-color: #464646; color: white; padding: 4px 12px; border-radius: 4px; font-weight: 600;">Option ${QUIZ_DATA.correctAnswer}</span></h4>
+            <div class="feedback-box correct-feedback">${correctOption.feedback}</div>
+          `;
+          solutionContent.appendChild(correctSection);
+        }
+        
+        // Show optimal segmentation explanation
+        this.renderOptimalSegmentation(solutionContent, correctOption);
+        
+        // Highlight the correct segmentation on the left passage
+        this.highlightPassageChunks(QUIZ_DATA.correctAnswer);
+        
+        // Fade transition
+        answerPhase.style.opacity = '0';
+        setTimeout(() => {
+          answerPhase.style.display = 'none';
+          solutionPhase.style.display = 'flex';
+          setTimeout(() => {
+            solutionPhase.classList.add('show');
+          }, 50);
+        }, 400);
+      }
+
+      renderOptimalSegmentation(container, option) {
+        const chunksSection = document.createElement('div');
+        chunksSection.innerHTML = `<h4 style="margin: 10px 0 8px 0; font-size: 0.95em;">Optimal Segmentation:</h4>`;
+        
+        const definitionsContainer = document.createElement('div');
+        definitionsContainer.className = 'chunk-definitions';
+        
+        option.chunks.forEach((chunk, index) => {
+          const chunkDiv = document.createElement('div');
+          chunkDiv.className = `chunk-definition chunk-display chunk-${(index % 2) + 1}`;
+          
+          const chunkTitle = document.createElement('h5');
+          chunkTitle.textContent = chunk.name;
+          chunkDiv.appendChild(chunkTitle);
+          
+          if (chunk.reasoning) {
+            const reasoningDiv = document.createElement('div');
+            reasoningDiv.className = 'reasoning-box';
+            reasoningDiv.innerHTML = `<strong>Why these belong together:</strong><br>${chunk.reasoning}`;
+            chunkDiv.appendChild(reasoningDiv);
+          }
+          
+          definitionsContainer.appendChild(chunkDiv);
+        });
+        
+        chunksSection.appendChild(definitionsContainer);
+        container.appendChild(chunksSection);
+      }
+
+      matchHeights() {
+        // Wait for content to render, then match heights
+        setTimeout(() => {
+          const passageSection = document.querySelector('.passage-section');
+          const interactionSection = document.querySelector('.interaction-section');
+          
+          if (passageSection && interactionSection) {
+            const passageHeight = passageSection.offsetHeight;
+            interactionSection.style.height = passageHeight + 'px';
+            
+            // Set overflow for scrolling when content is too long
+            const answerPhase = document.getElementById('answerPhase');
+            const solutionPhase = document.getElementById('solutionPhase');
+            
+            if (answerPhase) {
+              answerPhase.style.height = (passageHeight - 40) + 'px'; // Account for padding
+              answerPhase.style.overflowY = 'auto';
+            }
+            if (solutionPhase) {
+              solutionPhase.style.height = (passageHeight - 40) + 'px'; // Account for padding
+              solutionPhase.style.overflowY = 'auto';
+            }
+          }
+        }, 100);
+      }
+
+      resetQuiz() {
+        const answerPhase = document.getElementById('answerPhase');
+        const solutionPhase = document.getElementById('solutionPhase');
+        
+        // Reset state
+        this.selectedOption = null;
+        
+        // Clear selections
+        document.querySelectorAll('.option-card').forEach(card => {
+          card.classList.remove('selected');
+        });
+        document.querySelectorAll('input[name="chunking-option"]').forEach(radio => {
+          radio.checked = false;
+        });
+        
+        // Reset passage display
+        this.renderPassage();
+        
+        // Re-match heights after content change
+        this.matchHeights();
+        
+        // Fade transition
+        solutionPhase.classList.remove('show');
+        setTimeout(() => {
+          solutionPhase.style.display = 'none';
+          answerPhase.style.display = 'flex';
+          setTimeout(() => {
+            answerPhase.style.opacity = '1';
+          }, 50);
+        }, 400);
+      }
+    }
+
+    // Initialize embedded quiz when DOM is loaded
+    document.addEventListener('DOMContentLoaded', function() {
+      // Only initialize if quiz container exists
+      if (document.getElementById('quizContainer')) {
+        new EmbeddedQuiz();
+      }
+    });
+  </script>
+
+</body>
+</html>
